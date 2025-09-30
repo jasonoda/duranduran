@@ -13,7 +13,7 @@ export class UI {
 
         //-----------------
 
-        // console.log('PixiJS Version:', PIXI.VERSION);
+        console.log('PixiJS Version:', PIXI.VERSION);
 
         this.app = new PIXI.Application();
         this.app
@@ -28,10 +28,10 @@ export class UI {
 
     load() {
 
-        // console.log("LOAD IMAGES")
+        console.log("LOAD IMAGES")
 
-        // console.log(PIXI)
-        // console.log(PIXI.Assets);
+        console.log(PIXI)
+        console.log(PIXI.Assets);
 
         var images = [
             "black",
@@ -63,8 +63,8 @@ export class UI {
         const texturesPromise = PIXI.Assets.load(imagePaths);
 
         texturesPromise.then((textures) => {
-            // console.log(textures);  
-            // console.log("loaded")
+            console.log(textures);  
+            console.log("loaded")
 
             this.s = {};
 
@@ -100,17 +100,12 @@ export class UI {
         this.tw.cardOffset=2000;
 
         this.fortuneDiv = document.getElementById("fortuneDiv");
-        this.cardImageBack = document.getElementById("cardImageBack");
-        this.cardImageFront1 = document.getElementById("cardImageFront1");
-        this.cardImageFront2 = document.getElementById("cardImageFront2");
-        this.cardImageFront3 = document.getElementById("cardImageFront3");
-        this.cardImageFront4 = document.getElementById("cardImageFront4");
-        this.cardImageBlack = document.getElementById("cardImageBlack");
+        this.cardImage = document.getElementById("cardImage");
         this.cardText = document.getElementById("cardText");
         // this.textCont = document.getElementById("textCont");
 
-        // console.log("---------------------------")
-        // console.log("build")
+        console.log("---------------------------")
+        console.log("build")
 
         // let redBox = new PIXI.Graphics();
         // redBox.beginFill(0xFF0000);
@@ -363,7 +358,7 @@ export class UI {
 
         this.correct = document.getElementById("correct");
 
-        // console.log(this.tester);
+        console.log(this.tester);
 
         this.flashCount=0;
         this.bulbCount=0;
@@ -437,23 +432,15 @@ export class UI {
 
         this.fortuneDiv.style.top = ((window.innerHeight/2)+this.tw.cardOffset)+"px";
 
-        // Find the currently visible card image
-        let visibleCard = this.cardImageBack;
-        if(this.cardImageFront1.style.display === "block") visibleCard = this.cardImageFront1;
-        else if(this.cardImageFront2.style.display === "block") visibleCard = this.cardImageFront2;
-        else if(this.cardImageFront3.style.display === "block") visibleCard = this.cardImageFront3;
-        else if(this.cardImageFront4.style.display === "block") visibleCard = this.cardImageFront4;
-        else if(this.cardImageBlack.style.display === "block") visibleCard = this.cardImageBlack;
-        
-        this.cardWidth = visibleCard.clientWidth;
+        this.cardWidth = this.cardImage.clientWidth;
         this.cardText.style.width = Math.round(this.cardWidth*.87)+"px";
 
         // if the display is super skinny, shrink it down
 
-        if(Number(visibleCard.clientWidth)>=Number(this.fortuneDiv.clientWidth)-1){
-            visibleCard.style.width=this.fortuneDiv.clientWidth+"px";
+        if(Number(this.cardImage.clientWidth)>=Number(this.fortuneDiv.clientWidth)-1){
+            this.cardImage.style.width=this.fortuneDiv.clientWidth+"px";
         }else{
-            visibleCard.style.width="auto"
+            this.cardImage.style.width="auto"
         }
 
         //-----------------------------------------------------

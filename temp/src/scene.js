@@ -18,10 +18,10 @@ export class Scene {
     this.secs = 0;
     
     // Debug variable to test prize wins (turn on for testing)
-    this.dpw = false;
+    this.debugPrizeWin = false;
     
     // Prize winner tracking
-    this.ipw = false;
+    this.isPrizeWinner = false;
     this.hasCheckedWinner = false;
     
     window.addEventListener('click', (event) => {
@@ -187,9 +187,6 @@ export class Scene {
 
   checkForWinner(){
     
-    // Reset prize winner state before checking
-    this.ipw = false;
-    
     fetch('play_counter.php', {
       method: 'POST',
       headers: {
@@ -200,60 +197,17 @@ export class Scene {
     .then(data => {
       console.log('Play counter response:', data);
       if(data.is_winner){
-        this.ipw = true;
+        this.isPrizeWinner = true;
         console.log('Player is a winner! Play count:', data.play_count);
       }
     })
     .catch(error => {
       console.error('Error checking for winner:', error);
       // Fall back to debug mode if API fails
-      if(this.dpw){
-        this.ipw = true;
+      if(this.debugPrizeWin){
+        this.isPrizeWinner = true;
       }
     });
-    
-  }
-
-  async checkForWinnerSync(){
-    
-    // Reset prize winner state before checking
-    this.ipw = false;
-    this.prizeResultFound = false;
-
-    try {
-      const response = await fetch('play_counter.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      // console.log('Play counter response:', data);
-      
-      if(data.is_winner){
-        this.ipw = true;
-        this.prizeResultFound = true;
-        console.log('W:', data.play_count);
-      }else{
-        this.ipw = false;
-        this.prizeResultFound = true;
-        console.log('L:', data.play_count);
-      }
-
-    } catch(error) {
-      
-      console.error('Error checking for winner:', error);
-      console.error('Error type:', typeof error);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-      this.prizeResultFound = true;
-
-    }
     
   }
 
@@ -387,7 +341,7 @@ export class Scene {
 
   }
 
-  async update(){
+  update(){
 
     document.getElementById("feedback").innerHTML = this.action+"";
 
@@ -463,7 +417,7 @@ export class Scene {
         
         // Reset winner check for new game
         this.hasCheckedWinner = false;
-        this.ipw = false;
+        this.isPrizeWinner = false;
         
         this.action="animate"
         gsap.to( this.e.ui.blackFader, { alpha: 0, duration: .15, ease: "linear"});
@@ -516,33 +470,12 @@ export class Scene {
         this.hidePlayer()
 
         this.count=0;
-        this.callOnce=true;
-        this.action="ticket2_processing"
+        this.action="ticket2"
 
         this.e.s.p("tear")
 
         gsap.to( this.e.ui.ticket, { y: 3000, duration: .2, ease: "sine.out"});
         
-      }
-
-    }else if(this.action==="ticket2_processing"){
-
-      console.log("process >>>")
-
-      if(this.callOnce===true){
-        this.checkForWinnerSync();
-        this.callOnce=false;
-      }
-      this.action="ticket2_processing2"
-
-    }else if(this.action==="ticket2_processing2"){
-
-      if(this.prizeResultFound===true){
-
-        this.action="ticket2"
-
-        console.log("------------------")
-
       }
 
     }else if(this.action==="ticket2"){
@@ -558,14 +491,7 @@ export class Scene {
         // gsap.to( this.e.ui.bigTicketInnerCont, { y: 0, duration: .5, ease: "sine.out"});
         gsap.to( this.e.ui.tw, { cardOffset: -40, duration: .5, ease: "sine.out"});
         this.e.ui.cardText.style.opacity=0;
-        // Show the back card image
-        this.e.ui.cardImageBack.style.display = "block";
-        gsap.set(this.e.ui.cardImageBack, { scaleX: 1 });
-        this.e.ui.cardImageFront1.style.display = "none";
-        this.e.ui.cardImageFront2.style.display = "none";
-        this.e.ui.cardImageFront3.style.display = "none";
-        this.e.ui.cardImageFront4.style.display = "none";
-        this.e.ui.cardImageBlack.style.display = "none";
+        this.e.ui.cardImage.src = "./src/img/ticketBigBack.png";
         
         this.e.ui.whiteFader.alpha=.75;
         gsap.to( this.e.ui.whiteFader, { alpha: 0, duration: 3, ease: "linear"});
@@ -584,7 +510,7 @@ export class Scene {
       if(this.count>1){
 
         // gsap.to( this.e.ui.bigTicketInnerCont.scale, { x: 0, duration: .5, ease: "sine.out"});
-        gsap.to( this.e.ui.cardImageBack, { scaleX: 0, duration: .5, ease: "sine.out"});
+        gsap.to( this.e.ui.cardImage, { scaleX: 0, duration: .5, ease: "sine.out"});
 
         this.e.s.p("flip")
 
@@ -598,26 +524,18 @@ export class Scene {
       this.count+=this.e.dt;
       if(this.count>.5){
 
-        if(this.dpw || this.ipw){
-          
-          // Hide all card images
-          this.e.ui.cardImageBack.style.display = "none";
-          this.e.ui.cardImageFront1.style.display = "none";
-          gsap.set(this.e.ui.cardImageFront1, { scaleX: 1 });
-          this.e.ui.cardImageFront2.style.display = "none";
-          gsap.set(this.e.ui.cardImageFront2, { scaleX: 1 });
-          this.e.ui.cardImageFront3.style.display = "none";
-          gsap.set(this.e.ui.cardImageFront3, { scaleX: 1 });
-          this.e.ui.cardImageFront4.style.display = "none";
-          gsap.set(this.e.ui.cardImageFront4, { scaleX: 1 });
+        // Check for prize winner via PHP API (only once per game)
+        if(!this.hasCheckedWinner){
+          this.checkForWinner();
+          this.hasCheckedWinner = true;
+        }
+
+        // Check if player wins a prize
+        if(this.debugPrizeWin || this.isPrizeWinner){
           
           // Show black ticket with prize
-          this.e.ui.cardImageBlack.style.display = "block";
-          gsap.set(this.e.ui.cardImageBlack, { scaleX: 0 });
+          this.e.ui.cardImage.src = "./src/img/ticketBigBlack.png";
           this.cardLetter = "PRIZE";
-          
-          // Assign visible card for prize
-          this.visibleCard = this.e.ui.cardImageBlack;
           
           document.getElementById("sp1").innerHTML = "BLACK TICKET";
           document.getElementById("sp2").innerHTML = "You're a winner!<br>Use the merch code:<br><strong>53692</strong><br>For discounts at the merch store:<br><a href='https://duranduranofficialstore.com' target='_blank' style='color: white;'>duranduranofficialstore.com</a>";
@@ -631,6 +549,9 @@ export class Scene {
           // Hide share fortune button for prize tickets
           document.getElementById("shareFortune").style.display = "none";
           
+          // Turn off debug mode after first win
+          this.debugPrizeWin = false;
+          
         } else {
           
           // Reset text colors to original brown and red for regular fortunes
@@ -641,29 +562,14 @@ export class Scene {
           // Show share fortune button for regular fortunes
           document.getElementById("shareFortune").style.display = "block";
           
-          // Hide all card images first
-          this.e.ui.cardImageBack.style.display = "none";
-          this.e.ui.cardImageFront1.style.display = "none";
-          gsap.set(this.e.ui.cardImageFront1, { scaleX: 1 });
-          this.e.ui.cardImageFront2.style.display = "none";
-          gsap.set(this.e.ui.cardImageFront2, { scaleX: 1 });
-          this.e.ui.cardImageFront3.style.display = "none";
-          gsap.set(this.e.ui.cardImageFront3, { scaleX: 1 });
-          this.e.ui.cardImageFront4.style.display = "none";
-          gsap.set(this.e.ui.cardImageFront4, { scaleX: 1 });
-          this.e.ui.cardImageBlack.style.display = "none";
-          gsap.set(this.e.ui.cardImageBlack, { scaleX: 1 });
-
           if(this.qNum===1){
 
             this.cardNum = this.e.u.ran( this.e.words.fortune1.length );
             this.myFortune = this.e.words.fortune1[this.cardNum];
 
             // this.myFortune = this.e.u.ap( this.e.words.fortune1 );
-            this.e.ui.cardImageFront1.style.display = "block";
-            gsap.set(this.e.ui.cardImageFront1, { scaleX: 0 });
+            this.e.ui.cardImage.src = "./src/img/ticketBigFront1.png";
             this.cardLetter = "A";
-            this.visibleCard = this.e.ui.cardImageFront1;
 
           }else if(this.qNum===2){
 
@@ -671,10 +577,8 @@ export class Scene {
             this.myFortune = this.e.words.fortune2[this.cardNum];
 
             // this.myFortune = this.e.u.ap( this.e.words.fortune2 );
-            this.e.ui.cardImageFront2.style.display = "block";
-            gsap.set(this.e.ui.cardImageFront2, { scaleX: 0 });
+            this.e.ui.cardImage.src = "./src/img/ticketBigFront2.png";
             this.cardLetter = "B";
-            this.visibleCard = this.e.ui.cardImageFront2;
 
           }else if(this.qNum===3){
 
@@ -682,10 +586,8 @@ export class Scene {
             this.myFortune = this.e.words.fortune3[this.cardNum];
 
             // this.myFortune = this.e.u.ap( this.e.words.fortune3 );
-            this.e.ui.cardImageFront3.style.display = "block";
-            gsap.set(this.e.ui.cardImageFront3, { scaleX: 0 });
+            this.e.ui.cardImage.src = "./src/img/ticketBigFront3.png";
             this.cardLetter = "C";
-            this.visibleCard = this.e.ui.cardImageFront3;
 
           }else if(this.qNum===4){
 
@@ -693,10 +595,8 @@ export class Scene {
             this.myFortune = this.e.words.fortune4[this.cardNum];
 
             // this.myFortune = this.e.u.ap( this.e.words.fortune4 );
-            this.e.ui.cardImageFront4.style.display = "block";
-            gsap.set(this.e.ui.cardImageFront4, { scaleX: 0 });
+            this.e.ui.cardImage.src = "./src/img/ticketBigFront4.png";
             this.cardLetter = "D";
-            this.visibleCard = this.e.ui.cardImageFront4;
 
           }
     
@@ -711,8 +611,7 @@ export class Scene {
         // this.e.ui.ticketBig.texture = this.e.ui.s.ticketBigFront;
         // gsap.to( this.e.ui.bigTicketInnerCont.scale, { x: 1, duration: .5, ease: "sine.out"});
         
-        // Animate the visible card image
-        gsap.to( this.visibleCard, { scaleX: 1, duration: .5, ease: "sine.out"});
+        gsap.to( this.e.ui.cardImage, { scaleX: 1, duration: .5, ease: "sine.out"});
         gsap.to( this.e.ui.cardText, { opacity: 1, duration: .15, delay: .4, ease: "linear"});
         gsap.to( document.getElementById("endDiv"), { opacity: 1, duration: .25, delay: 1, ease: "linear"});
         document.getElementById("endDiv").style.pointerEvents = "auto";
