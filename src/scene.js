@@ -238,10 +238,12 @@ export class Scene {
       if(data.is_winner){
         this.ipw = true;
         this.prizeResultFound = true;
+        this.currentPlayCount = data.play_count;
         console.log('W:', data.play_count);
       }else{
         this.ipw = false;
         this.prizeResultFound = true;
+        this.currentPlayCount = data.play_count;
         console.log('L:', data.play_count);
       }
 
@@ -619,8 +621,25 @@ export class Scene {
           // Assign visible card for prize
           this.visibleCard = this.e.ui.cardImageBlack;
           
-          document.getElementById("sp1").innerHTML = "BLACK TICKET";
-          document.getElementById("sp2").innerHTML = "You're a winner!<br>Use the merch code:<br><strong>53692</strong><br>For discounts at the merch store:<br><a href='https://duranduranofficialstore.com' target='_blank' style='color: white;'>duranduranofficialstore.com</a>";
+          // Get the current play count to determine which code to show
+          const merchCodes = [
+            "FXGY7S81316Y",  // 500
+            "15E4WWN9B9D6",  // 1000
+            "2SWF2GBKWJ4Q",  // 1500
+            "TQ53Y1Z29B6B",  // 2000
+            "BKFASF6S8X9E"   // 2500
+          ];
+          
+          // Determine which code to show based on play count
+          let codeIndex = 0;
+          if (this.currentPlayCount >= 2500) codeIndex = 4;
+          else if (this.currentPlayCount >= 2000) codeIndex = 3;
+          else if (this.currentPlayCount >= 1500) codeIndex = 2;
+          else if (this.currentPlayCount >= 1000) codeIndex = 1;
+          else if (this.currentPlayCount >= 500) codeIndex = 0;
+          
+          document.getElementById("sp1").innerHTML = "BLACK TICKET<br><br>You're a winner!<br><br>Use the merch code:<br><strong>" + merchCodes[codeIndex] + "</strong><br><br>For discounts at the merch store:<br><a href='https://duranduranofficialstore.com' target='_blank' style='color: white;'>duranduranofficialstore.com</a>";
+          document.getElementById("sp2").innerHTML = "";
           document.getElementById("sp3").innerHTML = "";
           
           // Set text color to white for prize ticket
@@ -764,43 +783,51 @@ export class Scene {
       console.log("riddle")
 
       var currentDate = new Date();
-      var targetDate2 = new Date('2024-10-24T00:00:00');
-      var targetDate3 = new Date('2024-10-24T00:00:00');
+      // Release schedule (2025):
+      // 1) Psycho Killer ft. Victoria De Angelis — Launch: Oct 16, 2025
+      // 2) Danse Macabre — Launch: Oct 23, 2025
+      // 3) Paint it Black — Launch: Oct 31, 2025 (last day of October)
+      var targetDate1 = new Date('2025-10-16T00:00:00');
+      var targetDate2 = new Date('2025-10-23T00:00:00');
+      var targetDate3 = new Date('2025-10-31T00:00:00');
 
       document.getElementById("inputAnswer").value = "";
 
-      if (currentDate >= targetDate2) {
+      if (currentDate >= targetDate3) {
 
-        //question 2
-
-        document.getElementById("riddleText").innerHTML = "At 25 seconds, an unseen force wraps around you, tightening with every step. And as the clock nears 7 minutes before 2:00, its grip sinks deeper, dragging you down. What sinister power holds you captive in this endless dance?";
-        this.answer="shackles";
-        document.getElementById("spotifyPlayer").src = "https://open.spotify.com/embed/track/738RLtOpxjfII8Vps19R6i?utm_source=generator";
-        document.getElementById("rSong").innerHTML = "Danse Macabre";
-
-        console.log("It is October 25, 2024, or later.");
-
-      } else if(currentDate >= targetDate3){
-
-        //question 3
-
-        console.log("It is October 30, 2024, or later.");
-
+        // question 3 — Paint it Black (Oct 30, 2024)
+        console.log("It is October 31, 2025, or later.");
         document.getElementById("riddleText").innerHTML = "At the 5th second, a pulse quickens with life, and by the 97th, the warmth has drained into something colder, merging into one form. What remains from this eerie transformation?";
-        this.answer="purple"
+        this.answer = "purple";
         document.getElementById("spotifyPlayer").src = "https://open.spotify.com/embed/track/4WLkxJ687m7aConmw5t88M?utm_source=generator";
         document.getElementById("rSong").innerHTML = "Paint it Black";
 
+      } else if (currentDate >= targetDate2) {
+
+        // question 2 — Danse Macabre (Oct 23, 2024)
+        console.log("It is October 23, 2025, or later.");
+        document.getElementById("riddleText").innerHTML = "At 25 seconds, an unseen force wraps around you, tightening with every step. And as the clock nears 7 minutes before 2:00, its grip sinks deeper, dragging you down. What sinister power holds you captive in this endless dance?";
+        this.answer = "shackles";
+        document.getElementById("spotifyPlayer").src = "https://open.spotify.com/embed/track/738RLtOpxjfII8Vps19R6i?utm_source=generator";
+        document.getElementById("rSong").innerHTML = "Danse Macabre";
+
+      } else if (currentDate >= targetDate1) {
+
+        // question 1 — Psycho Killer ft. Victoria De Angelis (Oct 16, 2024)
+        console.log("It is October 16, 2025, or later.");
+        document.getElementById("riddleText").innerHTML = "At 43 seconds, something ignites where you should rest, turning comfort into danger. What word burns at the heart of this restless moment?";
+        this.answer = "fire";
+        document.getElementById("spotifyPlayer").src = "https://open.spotify.com/embed/track/2V0lfCii0ALLtDNux5HshS?utm_source=generator";
+        document.getElementById("rSong").innerHTML = "Psycho Killer ft. Victoria De Angelis";
+
       } else {
 
-        //question 1
-
-        console.log("It is not yet October 24, 2024.");
-
+        // Default to question 1 — Psycho Killer ft. Victoria De Angelis (Oct 16, 2025)
+        console.log("It is before October 16, 2025. Defaulting to first riddle.");
         document.getElementById("riddleText").innerHTML = "At 43 seconds, something ignites where you should rest, turning comfort into danger. What word burns at the heart of this restless moment?";
-        this.answer="fire";
+        this.answer = "fire";
         document.getElementById("spotifyPlayer").src = "https://open.spotify.com/embed/track/2V0lfCii0ALLtDNux5HshS?utm_source=generator";
-        document.getElementById("rSong").innerHTML = "Psycho Killer";
+        document.getElementById("rSong").innerHTML = "Psycho Killer ft. Victoria De Angelis";
 
       }
 
