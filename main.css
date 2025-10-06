@@ -1,3 +1,35 @@
+#orientationOverlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    z-index: 500000; /* ensure above everything */
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+#orientationInner{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-family: fortuneFont;
+    text-align: center;
+}
+
+#orientationIcon{
+    width: auto;
+    height: auto;
+    max-height: 100px;
+    max-width: 80vw;
+    margin-bottom: 16px;
+}
+
+#orientationText{
+    font-size: 20px;
+    letter-spacing: 1px;
+}
 body{
     margin: 0px;
     padding: 0px;
@@ -79,7 +111,7 @@ body{
 #sp2{
     color: #872200;
     font-size: 2.8vh;
-    margin-bottom: 2px;
+    margin-bottom: 12px;
     opacity: .85;
 }
 
@@ -88,12 +120,27 @@ body{
     font-size: 2.1vh;
 }
 
+/* Mobile Safari can make vh unstable due to dynamic toolbars.
+   Prefer stable viewport units where supported to keep text scaling consistent. */
+@supports (height: 100svh) {
+    #sp1 { font-size: 2.1svh; }
+    #sp2 { font-size: 2.8svh; }
+    #sp3 { font-size: 2.1svh; }
+}
+
+/* Fallback tuning for small screens: cap extremes with clamp using vw+vh mix */
+@media (max-width: 768px) {
+    #sp1 { font-size: clamp(18px, 1.8vw + 0.8vh, 20px); line-height: 1.2; }
+    #sp2 { font-size: clamp(18px, 2.2vw + 1.0vh, 24px); line-height: 1.15; }
+    #sp3 { font-size: clamp(18px, 1.8vw + 0.8vh, 20px); line-height: 1.2; }
+}
+
 #fortuneDiv{
     position: absolute;
     width: 84%;
     height: 100%;
     max-width: 400px;
-    max-height: 70%;
+    max-height: 80%;
     font-family: fortuneFont;
     
     top: 50%;
@@ -376,6 +423,30 @@ body{
     /* border: 2px solid blue; */
 }
 
+#shareHeader{
+    position: absolute;
+    top: 8px;
+    left: 0;
+    right: 0;
+    margin: auto;
+    text-align: center;
+    color: #ffffff;
+    font-family: Rod;
+    font-size: 14px;
+    z-index: 23010;
+}
+
+#shareFrame{
+    position: absolute;
+    top: 32px;
+    left: 3%;
+    width: 94%;
+    height: calc(100% - 90px);
+    border: none;
+    background: #000000;
+    z-index: 23005;
+}
+
 #loadingImage{
     position: fixed;
     width: 237px;
@@ -481,7 +552,7 @@ body{
     /* padding: 10px; */
     /* transform: translateX(-50%); */
     z-index: 3000;
-    bottom: 84px;
+    bottom: 40px;
     opacity: 0;
     pointer-events: none;
 }

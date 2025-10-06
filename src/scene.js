@@ -16,6 +16,8 @@ export class Scene {
     this.count=0;
     this.mins = 0;
     this.secs = 0;
+    // TEMP DEBUG: enable keyboard browsing of fortunes on the result screen
+    this.debugFortuneBrowse = false;
     
     // Debug variable to test prize wins (turn on for testing)
     this.dpw = false;
@@ -23,6 +25,23 @@ export class Scene {
     // Prize winner tracking
     this.ipw = false;
     this.hasCheckedWinner = false;
+    // Orientation overlay handling on mobile
+    const handleOrientation = () => {
+      try{
+        const isLandscape = window.matchMedia('(orientation: landscape)').matches || (window.innerWidth > window.innerHeight);
+        const el = document.getElementById('orientationOverlay');
+        if(!el) return;
+        if(this.e && this.e.mobile===true && isLandscape){
+          el.style.display = 'flex';
+        }else{
+          el.style.display = 'none';
+        }
+      }catch(err){}
+    };
+    window.addEventListener('orientationchange', handleOrientation);
+    window.addEventListener('resize', handleOrientation);
+    // initial check
+    handleOrientation();
     
     window.addEventListener('click', (event) => {
 
@@ -143,23 +162,20 @@ export class Scene {
     });
 
     document.getElementById("shareBut").addEventListener('click', (event) => {
-      this.share();
+      this.downloadTarotMacabre();
     });
 
     document.getElementById("shareBut").addEventListener('touchstart', (event) => {
-      this.share();
+      this.downloadTarotMacabre();
     });
 
     document.getElementById("shareFortune").addEventListener('click', (event) => {
-      if(this.e.mobile===false){
-        this.shareFortune();
-      }
+      this.share();
     });
 
     document.getElementById("shareFortune").addEventListener('touchstart', (event) => {
-      if(this.e.mobile===true){
-        this.shareFortune();
-      }
+      event.preventDefault();
+      this.share();
     });
 
     document.getElementById("homeBut").addEventListener('click', (event) => {
@@ -171,6 +187,18 @@ export class Scene {
     document.getElementById("homeBut").addEventListener('touchstart', (event) => {
       if(this.e.mobile===true){
         this.home();
+      }
+    });
+
+    // TEMP DEBUG: Arrow key navigation through fortunes while on the fortune display
+    document.addEventListener('keydown', (event) => {
+      if(!this.debugFortuneBrowse) return;
+      if(this.action!=="ticket6") return;
+      if(this.dpw || this.ipw) return; // don't browse when prize ticket
+      if(event.key === 'ArrowRight'){
+        this.navigateFortunes(1);
+      }else if(event.key === 'ArrowLeft'){
+        this.navigateFortunes(-1);
       }
     });
 
@@ -295,13 +323,42 @@ export class Scene {
         ctx.strokeText(text, canvas.width / 2, canvas.height *.93 + 15);
         ctx.fillText(text, canvas.width / 2, canvas.height *.93 + 15);
 
-        // document.getElementById('canvasShare').style.display="block";
+        // Prefer blob; iOS: open in new tab for long-press; Desktop: direct download
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        canvas.toBlob(async (blob) => {
+          if(!blob){
+            // Fallback to data URL if blob unavailable
+            const imageData = canvas.toDataURL('image/png');
+            if(isIOS){
+            // Show overlay and populate iframe for long-press save (safeguarded)
+            this.openShareOverlayWithSrc(imageData, false);
+              return;
+            }
+            const link = document.createElement('a');
+            link.download = 'shareScore.png';
+            link.href = imageData;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+          }
 
-        const image = canvas.toDataURL('image/png').replace('image/png', 'image/octet-stream');
-        const link = document.createElement('a');
-        link.download = 'shareScore.png';
-        link.href = image;
-        link.click();
+          const objectUrl = URL.createObjectURL(blob);
+          if(isIOS){
+            // Show overlay via helper; revoke on close managed by currentShareObjectUrl
+            this.openShareOverlayWithSrc(objectUrl, true);
+            return;
+          }
+
+          // Desktop and other browsers: trigger download
+          const link = document.createElement('a');
+          link.download = 'shareScore.png';
+          link.href = objectUrl;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+        }, 'image/png');
     }
     img.src = './src/img/shareScore.png';
 
@@ -309,29 +366,162 @@ export class Scene {
 
   shareFortune(){
 
-    console.log("./src/img/shareCards/card"+this.cardLetter+"_"+(this.cardNum+1)+".png")
+    // Capture the visible ticket area to a PNG for social sharing
+    const fortuneDiv = document.getElementById('fortuneDiv');
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    // Open a blank tab synchronously on iOS to avoid popup blocking; we'll populate it later (not needed with iframe, but keep fallback)
+    let tempWindow = null;
+    if(isIOS){
+      try{ tempWindow = window.open('', '_blank'); }catch(e){ tempWindow = null; }
+    }
 
-    const image = document.getElementById('shareFortuneImage');
-    image.src = "./src/img/shareCards/card"+this.cardLetter+"_"+(this.cardNum+1)+".png";
-    const imageUrl = image.src;
-    const imageName = 'tarotmacabre.png';
+    // Safety: pause animations and hide external iframes to avoid capture artifacts/CORS
+    const prevAniStates = [];
+    if(this.e && this.e.ui && Array.isArray(this.e.ui.animatedSprites)){
+      for(let i=0;i<this.e.ui.animatedSprites.length;i++){
+        const spr = this.e.ui.animatedSprites[i];
+        prevAniStates[i] = spr.aniPause;
+        spr.aniPause = true;
+      }
+    }
 
-    const link = document.createElement('a');
-    link.href = imageUrl; 
-    link.download = imageName;
+    const spotify = document.getElementById('spotifyPlayer');
+    const prevSpotifyOpacity = spotify ? spotify.style.opacity : null;
+    const prevSpotifyPE = spotify ? spotify.style.pointerEvents : null;
+    if(spotify){
+      spotify.style.opacity = 0;
+      spotify.style.pointerEvents = 'none';
+    }
 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Insert temporary overlay text to replace any "play again" callout with site URL
+    const tempOverlay = document.createElement('div');
+    tempOverlay.textContent = 'tarot-macabre.com';
+    tempOverlay.style.position = 'absolute';
+    tempOverlay.style.left = '50%';
+    tempOverlay.style.bottom = '7px';
+    tempOverlay.style.transform = 'translateX(-50%)';
+    // Match sp1 font and color
+    const sp1 = document.getElementById('sp1');
+    if(sp1){
+      const sp1Style = window.getComputedStyle(sp1);
+      tempOverlay.style.fontFamily = sp1Style.fontFamily;
+      tempOverlay.style.fontSize = sp1Style.fontSize;
+      tempOverlay.style.fontWeight = sp1Style.fontWeight;
+      tempOverlay.style.letterSpacing = sp1Style.letterSpacing;
+      tempOverlay.style.color = sp1Style.color;
+    }
+    // No shadow per request
+    tempOverlay.style.textShadow = 'none';
+    // Keep on one line
+    tempOverlay.style.whiteSpace = 'nowrap';
+    tempOverlay.style.maxWidth = Math.round(fortuneDiv.clientWidth * 0.9) + 'px';
+    tempOverlay.style.overflow = 'hidden';
+    tempOverlay.style.textOverflow = 'clip';
+    tempOverlay.style.zIndex = '99999';
+    tempOverlay.style.pointerEvents = 'none';
+    fortuneDiv.appendChild(tempOverlay);
+
+    // Increase scale for sharper result on mobile/IG
+    const scale = Math.min(2, Math.max(1, window.devicePixelRatio || 1.5));
+
+    html2canvas(fortuneDiv, {
+      backgroundColor: '#000000',
+      scale: scale,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      windowWidth: document.documentElement.scrollWidth,
+      windowHeight: document.documentElement.scrollHeight
+    }).then(canvas => {
+      // Restore state
+      if(this.e && this.e.ui && Array.isArray(this.e.ui.animatedSprites)){
+        for(let i=0;i<this.e.ui.animatedSprites.length;i++){
+          this.e.ui.animatedSprites[i].aniPause = prevAniStates[i];
+        }
+      }
+      if(spotify){
+        spotify.style.opacity = prevSpotifyOpacity;
+        spotify.style.pointerEvents = prevSpotifyPE;
+      }
+      if(tempOverlay && tempOverlay.parentNode){
+        tempOverlay.parentNode.removeChild(tempOverlay);
+      }
+
+      // Prefer blob for better iOS compatibility; populate iframe with the image
+      canvas.toBlob(async (blob) => {
+        if(!blob){
+          // Fallback to data URL if blob unavailable
+          const imageData = canvas.toDataURL('image/png');
+          if(this.e && this.e.mobile===false){
+            const link = document.createElement('a');
+            link.download = 'tarotmacabre.png';
+            link.href = imageData;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+          }
+          const frame = document.getElementById('shareFrame');
+          try{
+            const doc = frame.contentDocument || frame.contentWindow.document;
+            doc.open();
+            doc.write('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" /></head><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;">\n' +
+                      '<img src="' + imageData + '" style="max-width:100%;max-height:100%;object-fit:contain;" />\n' +
+                      '</body></html>');
+            doc.close();
+          }catch(e){
+            frame.src = imageData;
+          }
+          return;
+        }
+
+        const objectUrl = URL.createObjectURL(blob);
+        if(this.e && this.e.mobile===false){
+          // Desktop: direct download
+          const link = document.createElement('a');
+          link.download = 'tarotmacabre.png';
+          link.href = objectUrl;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+        }else{
+          // Mobile: Safeguarded overlay population
+          this.openShareOverlayWithSrc(objectUrl, true);
+        }
+      }, 'image/png');
+    }).catch(err => {
+      // Restore state on error
+      if(this.e && this.e.ui && Array.isArray(this.e.ui.animatedSprites)){
+        for(let i=0;i<this.e.ui.animatedSprites.length;i++){
+          this.e.ui.animatedSprites[i].aniPause = prevAniStates[i];
+        }
+      }
+      if(spotify){
+        spotify.style.opacity = prevSpotifyOpacity;
+        spotify.style.pointerEvents = prevSpotifyPE;
+      }
+      if(tempOverlay && tempOverlay.parentNode){
+        tempOverlay.parentNode.removeChild(tempOverlay);
+      }
+      console.error('Share capture failed:', err);
+    });
 
   }
 
   share(){
+    // Desktop: download directly; Mobile: show overlay and long-press via iframe
+    if(this.e && this.e.mobile===false){
+      this.shareFortune();
+      return;
+    }
     document.getElementById('shareDiv').style.display = "inline";
+    this.shareFortune();
   }
 
   closeShare(){
     document.getElementById('shareDiv').style.display = "none";
+    this.resetShareOverlay();
   }
 
   downloadShare(){
@@ -342,10 +532,119 @@ export class Scene {
     const imageUrl = image.src;
     const imageName = 'tarotmacabre.png';
 
-    const link = document.createElement('a');
-    link.href = imageUrl; 
-    link.download = imageName;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
+    // iOS: open current object/data URL in a new tab for long-press save
+    if(isIOS){
+      if(this.currentShareObjectUrl){
+        window.open(this.currentShareObjectUrl, '_blank');
+        return;
+      }
+      if(imageUrl && (imageUrl.startsWith('blob:') || imageUrl.startsWith('data:'))){
+        window.open(imageUrl, '_blank');
+        return;
+      }
+      // If we have a normal URL, fall through to fetch -> blob -> open
+    }
+
+    // Desktop and non-iOS: fetch and trigger download; iOS fallback opens new tab
+    fetch(imageUrl, { mode: 'same-origin' })
+      .then(res => res.blob())
+      .then(async (blob) => {
+        const file = new File([blob], imageName, { type: blob.type || 'image/png' });
+
+        const objectUrl = URL.createObjectURL(blob);
+        if(isIOS){
+          // iOS Safari: open in a new tab for long-press save
+          window.open(objectUrl, '_blank');
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+          return;
+        }
+
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = imageName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+      })
+      .catch(() => {
+        // Last-resort fallback: attempt direct navigation
+        if(isIOS){
+          window.open(imageUrl, '_blank');
+        }else{
+          const link = document.createElement('a');
+          link.href = imageUrl;
+          link.download = imageName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      });
+
+  }
+
+  // --- Share overlay helpers (safeguards) ---
+  resetShareOverlay(){
+    // Revoke any active object URL used for overlay
+    if(this.currentShareObjectUrl){
+      try{ URL.revokeObjectURL(this.currentShareObjectUrl); }catch(e){}
+      this.currentShareObjectUrl = null;
+    }
+    // Clear iframe content to a known baseline and remove any previous src
+    const frame = document.getElementById('shareFrame');
+    if(frame){
+      try{
+        frame.removeAttribute('src');
+        const doc = frame.contentDocument || frame.contentWindow.document;
+        doc.open();
+        doc.write('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" /></head><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;"></body></html>');
+        doc.close();
+      }catch(e){ frame.src = 'about:blank'; }
+    }
+  }
+
+  openShareOverlayWithSrc(imageSrc, isObjectUrl){
+    // Always start from a clean state
+    this.resetShareOverlay();
+    const frame = document.getElementById('shareFrame');
+    if(frame){
+      try{
+        const doc = frame.contentDocument || frame.contentWindow.document;
+        doc.open();
+        doc.write('<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" /></head><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;">\n' +
+                  '<img src="' + imageSrc + '" style="max-width:100%;max-height:100%;object-fit:contain;image-rendering:auto;" />\n' +
+                  '</body></html>');
+        doc.close();
+      }catch(e){
+        frame.src = imageSrc;
+      }
+    }
+    if(isObjectUrl){
+      this.currentShareObjectUrl = imageSrc;
+    }
+    document.getElementById('shareDiv').style.display = "inline";
+  }
+
+  // Download the static tarotMacabre image without showing the ticket share overlay
+  downloadTarotMacabre(){
+
+    const imagePath = './src/img/tarotMacabre.png';
+    const imageName = 'tarotmacabre.png';
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    if(isIOS){
+      // Open in a new tab for long-press save
+      window.open(imagePath, '_blank');
+      return;
+    }
+
+    // Desktop and others: trigger download
+    const link = document.createElement('a');
+    link.href = imagePath;
+    link.download = imageName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -675,7 +974,7 @@ export class Scene {
 
           if(this.qNum===1){
 
-            this.cardNum = this.e.u.ran( this.e.words.fortune1.length );
+            this.cardNum = this.debugFortuneBrowse ? 0 : this.e.u.ran( this.e.words.fortune1.length );
             this.myFortune = this.e.words.fortune1[this.cardNum];
 
             // this.myFortune = this.e.u.ap( this.e.words.fortune1 );
@@ -686,7 +985,7 @@ export class Scene {
 
           }else if(this.qNum===2){
 
-            this.cardNum = this.e.u.ran( this.e.words.fortune2.length );
+            this.cardNum = this.debugFortuneBrowse ? 0 : this.e.u.ran( this.e.words.fortune2.length );
             this.myFortune = this.e.words.fortune2[this.cardNum];
 
             // this.myFortune = this.e.u.ap( this.e.words.fortune2 );
@@ -697,7 +996,7 @@ export class Scene {
 
           }else if(this.qNum===3){
 
-            this.cardNum = this.e.u.ran( this.e.words.fortune3.length );
+            this.cardNum = this.debugFortuneBrowse ? 0 : this.e.u.ran( this.e.words.fortune3.length );
             this.myFortune = this.e.words.fortune3[this.cardNum];
 
             // this.myFortune = this.e.u.ap( this.e.words.fortune3 );
@@ -708,7 +1007,7 @@ export class Scene {
 
           }else if(this.qNum===4){
 
-            this.cardNum = this.e.u.ran( this.e.words.fortune4.length );
+            this.cardNum = this.debugFortuneBrowse ? 0 : this.e.u.ran( this.e.words.fortune4.length );
             this.myFortune = this.e.words.fortune4[this.cardNum];
 
             // this.myFortune = this.e.u.ap( this.e.words.fortune4 );
@@ -916,6 +1215,27 @@ export class Scene {
       const remainingSeconds = Math.floor(seconds % 60);
       const formattedSeconds = remainingSeconds < 10 ? `0${remainingSeconds}` : remainingSeconds;
       return `${minutes}:${formattedSeconds}`;
+  }
+
+  // TEMP DEBUG: navigate fortunes left/right when on the fortune display
+  navigateFortunes(delta){
+    let list;
+    if(this.qNum===1){ list = this.e.words.fortune1; }
+    else if(this.qNum===2){ list = this.e.words.fortune2; }
+    else if(this.qNum===3){ list = this.e.words.fortune3; }
+    else if(this.qNum===4){ list = this.e.words.fortune4; }
+    else { return; }
+
+    if(!Array.isArray(list) || list.length===0) return;
+    this.cardNum = ( (this.cardNum || 0) + delta + list.length ) % list.length;
+    this.myFortune = list[this.cardNum];
+
+    // Update text fields
+    if(this.myFortune){
+      document.getElementById("sp1").innerHTML = this.myFortune[0] || "";
+      document.getElementById("sp2").innerHTML = this.myFortune[1] ? ("\u201C"+this.myFortune[1]+"\u201D") : "";
+      document.getElementById("sp3").innerHTML = this.myFortune[2] || "";
+    }
   }
 
 }
